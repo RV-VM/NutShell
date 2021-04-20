@@ -7,6 +7,8 @@
 #include <stdint.h>
 #include <assert.h>
 
+#define NO_DIFFTEST
+
 #ifdef __cplusplus
 # include <stdexcept>
 # define print_and_die(s) throw std::runtime_error(s)

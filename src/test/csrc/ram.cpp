@@ -6,9 +6,9 @@
 static paddr_t ram[RAMSIZE / sizeof(paddr_t)];
 static long img_size = 0;
 void* get_img_start() { return &ram[0]; }
-long get_img_size() { return img_size; }
+long get_img_size() { return RAMSIZE; }   
 
-void addpageSv39() {
+void addpageSv39(bool napot_on) {
 //three layers
 //addr range: 0x0000000080000000 - 0x0000000088000000 for 128MB from 2GB - 2GB128MB
 //the first layer: one entry for 1GB. (512GB in total by 512 entries). need the 2th entries
@@ -43,7 +43,10 @@ void addpageSv39() {
   
   for(int outidx = 0; outidx < PTEMMIONUM; outidx++) {
     for(int inidx = 0; inidx < ENTRYNUM; inidx++) {
-      ptemmio[outidx][inidx] = (((0x40000000 + outidx*PTEVOLUME + inidx*PAGESIZE) & 0xfffff000) >> 2) | 0xf;
+      if(!napot_on) 
+        ptemmio[outidx][inidx] = (((0x40000000 + outidx*PTEVOLUME + inidx*PAGESIZE) & 0xfffff000) >> 2) | 0xf;
+      else
+        ptemmio[outidx][inidx] = ((((0x40000000 + outidx*PTEVOLUME + inidx*PAGESIZE) & 0xffff0000) | 0x00008000) >> 2) | 0xf | 0x4000000000000000;
     }
   }
   
@@ -58,7 +61,10 @@ void addpageSv39() {
 
   for(int outidx = 0; outidx < PTENUM; outidx++ ) {
     for(int inidx = 0; inidx < ENTRYNUM; inidx++ ) {
-      pte[outidx][inidx] = (((0x80000000 + outidx*PTEVOLUME + inidx*PAGESIZE) & 0xfffff000)>>2) | 0xf;
+      if(!napot_on)
+        pte[outidx][inidx] = (((0x80000000 + outidx*PTEVOLUME + inidx*PAGESIZE) & 0xfffff000)>>2) | 0xf;
+      else 
+        pte[outidx][inidx] = ((((0x80000000 + outidx*PTEVOLUME + inidx*PAGESIZE) & 0xffff0000) | 0x00008000) >> 2) | 0xf | 0x4000000000000000;
     }
   }
 
@@ -88,7 +94,7 @@ void init_ram(const char *img) {
   fclose(fp);
 
   //new add
-  addpageSv39();
+  addpageSv39(false);
   //new end
 }
 

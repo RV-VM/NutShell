@@ -56,6 +56,22 @@ class EmbeddedTLBMD(implicit val tlbConfig: TLBConfig) extends TlbModule {
 
   when (wen) { tlbmd.write(setIdx, wdata, waymask.asBools) }
 
+  // when(wen)
+  // {
+  //   printf("-------------------------------- cut here --------------------------------\n")
+  //   for(i <- (0 until Sets))
+  //   {
+  //     for(j <- (0 until Ways))
+  //     {
+  //       when(tlbmd(i)(j).asTypeOf(tlbBundle).flag.asTypeOf(flagBundle).v)
+  //       {
+  //         printf("TLB entry Set:%d , Way:%d, vpn:%x , mask:%x , flag:%x , ppn:%x \n",i.U,j.U,tlbmd(i)(j).asTypeOf(tlbBundle).vpn,tlbmd(i)(j).asTypeOf(tlbBundle).mask,tlbmd(i)(j).asTypeOf(tlbBundle).flag,tlbmd(i)(j).asTypeOf(tlbBundle).ppn)
+  //       }
+  //     }
+  //   }
+  //   printf("-------------------------------- end here --------------------------------\n")
+  // }
+
   io.ready := !resetState
   def rready() = !resetState
   def wready() = !resetState
@@ -99,7 +115,8 @@ class EmbeddedTLB(implicit val tlbConfig: TLBConfig) extends TlbModule{
   mdTLB.reset := reset.asBool || flushTLB
 
   // VM enable && io
-  val vmEnable = satp.asTypeOf(satpBundle).mode === 8.U && (io.csrMMU.priviledgeMode < ModeM)
+  // val vmEnable = satp.asTypeOf(satpBundle).mode === 8.U && (io.csrMMU.priviledgeMode < ModeM)
+  val vmEnable = satp.asTypeOf(satpBundle).mode === 8.U 
 
   def PipelineConnectTLB[T <: Data](left: DecoupledIO[T], right: DecoupledIO[T], update: Bool, rightOutFire: Bool, isFlush: Bool, vmEnable: Bool) = {
     val valid = RegInit(false.B)
@@ -317,17 +334,21 @@ class EmbeddedTLBExec(implicit val tlbConfig: TLBConfig) extends TlbModule{
           val permStore = permCheck && missflag.w
           val updateAD = if (Settings.get("FPGAPlatform")) !missflag.a || (!missflag.d && req.isWrite()) else false.B
           val updateData = Cat( 0.U(56.W), req.isWrite(), 1.U(1.W), 0.U(6.W) )
+          val napotCheck = if(napot_on) 
+                              ((level =/= 1.U) || ((!memRdata.c && memRdata.n && memRdata.ppn(napot_bits-1,0) === napot_patten.U) || (!memRdata.c && !memRdata.n)))
+                            else 
+                              true.B
           missRefillFlag := Cat(req.isWrite(), 1.U(1.W), 0.U(6.W)) | missflag.asUInt
           memRespStore := io.mem.resp.bits.rdata | updateData 
           if(tlbname == "itlb") {
-            when (!permExec) { missIPF := true.B ; state := s_wait_resp}
+            when (!(permExec && napotCheck)) { missIPF := true.B ; state := s_wait_resp}
             .otherwise { 
               state := Mux(updateAD, s_write_pte, s_wait_resp)
               missMetaRefill := true.B
             }
           }
           if(tlbname == "dtlb") {
-            when((!permLoad && req.isRead()) || (!permStore && req.isWrite())) { 
+            when((!(permLoad && napotCheck) && req.isRead()) || (!(permStore && napotCheck) && req.isWrite())) { 
               state := s_miss_slpf
               loadPF := req.isRead() && !isAMO
               storePF := req.isWrite() || isAMO
@@ -336,7 +357,10 @@ class EmbeddedTLBExec(implicit val tlbConfig: TLBConfig) extends TlbModule{
               missMetaRefill := true.B
             }
           }
-          missMask := Mux(level===3.U, 0.U(maskLen.W), Mux(level===2.U, "h3fe00".U(maskLen.W), "h3ffff".U(maskLen.W)))
+          if(napot_on)
+            missMask := Mux(level===3.U, 0.U(maskLen.W), Mux(level===2.U, "h3fe00".U(maskLen.W), Mux((!memRdata.c && memRdata.n && memRdata.ppn(napot_bits-1,0) === napot_patten.U),napot_mask.U(maskLen.W),"h3ffff".U(maskLen.W))))
+          else
+            missMask := Mux(level===3.U, 0.U(maskLen.W), Mux(level===2.U, "h3fe00".U(maskLen.W), "h3ffff".U(maskLen.W)))
           missMaskStore := missMask
         }
         level := level - 1.U

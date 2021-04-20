@@ -50,6 +50,12 @@ sealed trait Sv39Const extends HasNutCoreParameter{
   //val paResLen = 25 // unused 
   val pteResLen = XLEN - ppnLen - 2 - flagLen
 
+  //for svnapot extension
+  val napot_on = if (Settings.get("Napot_on")) true else false  
+  val napot_bits = 4
+  val napot_patten = "b1000"//1000(binary)
+  val napot_mask : String = "h3fff0"
+
   def vaBundle = new Bundle {
     val vpn2 = UInt(vpn2Len.W)
     val vpn1 = UInt(vpn1Len.W)
@@ -90,7 +96,11 @@ sealed trait Sv39Const extends HasNutCoreParameter{
   }
   
   def pteBundle = new Bundle {
-    val reserved  = UInt(pteResLen.W)
+    
+    val c = if(napot_on) Bool() else null
+    val n = if(napot_on) Bool() else null
+    
+    val reserved  = if (napot_on) UInt((pteResLen - 2).W) else UInt(pteResLen.W)
     val ppn  = UInt(ppnLen.W)
     val rsw  = UInt(2.W)
     val flag = new Bundle {
