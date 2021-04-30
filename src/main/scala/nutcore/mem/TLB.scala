@@ -302,9 +302,9 @@ class TLB(implicit val tlbConfig: TLBConfig) extends TlbModule{
   mdTLB.reset := reset.asBool || flushTLB
 
   // VM enable && io
-  //val vmEnable = satp.asTypeOf(satpBundle).mode === 8.U && (io.csrMMU.priviledgeMode < ModeM)
+  val vmEnable = satp.asTypeOf(satpBundle).mode === 10.U && (io.csrMMU.priviledgeMode < ModeM)
   //val vmEnable = satp.asTypeOf(satpBundle).mode === 8.U
-  val vmEnable = satp.asTypeOf(satpBundle).mode === 8.U || satp.asTypeOf(satpBundle).mode === 0.U
+  //val vmEnable = satp.asTypeOf(satpBundle).mode === 8.U || satp.asTypeOf(satpBundle).mode === 0.U
 
   def PipelineConnectTLB[T <: Data](left: DecoupledIO[T], right: DecoupledIO[T], update: Bool, rightOutFire: Bool, isFlush: Bool, vmEnable: Bool) = {
     val valid = RegInit(false.B)
