@@ -322,17 +322,21 @@ class EmbeddedTLBExec(implicit val tlbConfig: TLBConfig) extends TlbModule{
           val permStore = permCheck && missflag.w
           val updateAD = if (Settings.get("FPGAPlatform")) !missflag.a || (!missflag.d && req.isWrite()) else false.B
           val updateData = Cat( 0.U(56.W), req.isWrite(), 1.U(1.W), 0.U(6.W) )
+          val napotCheck = if(napot_on) 
+                           ((level =/= 1.U) || ((!memRdata.c && memRdata.n && memRdata.ppn(napot_bits-1,0) === napot_patten.U) || (!memRdata.c && !memRdata.n)))
+                           else 
+                           true.B
           missRefillFlag := Cat(req.isWrite(), 1.U(1.W), 0.U(6.W)) | missflag.asUInt
           memRespStore := io.mem.resp.bits.rdata | updateData 
           if(tlbname == "itlb") {
-            when (!permExec) { missIPF := true.B ; state := s_wait_resp}
+            when (!(permExec && napotCheck)) { missIPF := true.B ; state := s_wait_resp}
             .otherwise { 
               state := Mux(updateAD, s_write_pte, s_wait_resp)
               missMetaRefill := true.B
             }
           }
           if(tlbname == "dtlb") {
-            when((!permLoad && req.isRead()) || (!permStore && req.isWrite())) { 
+            when((!(permLoad && napotCheck) && req.isRead()) || (!(permStore && napotCheck) && req.isWrite())) { 
               state := s_miss_slpf
               loadPF := req.isRead() && !isAMO
               storePF := req.isWrite() || isAMO
@@ -342,7 +346,13 @@ class EmbeddedTLBExec(implicit val tlbConfig: TLBConfig) extends TlbModule{
             }
           }
           //missMask := Mux(level===3.U, 0.U(maskLen.W), Mux(level===2.U, "h3fe00".U(maskLen.W), "h3ffff".U(maskLen.W)))
+          if(napot_on)
+          {
+          missMask := Mux(level===5.U, 0.U(maskLen.W), Mux(level===4.U, "hffff8000000".U(maskLen.W), Mux(level===3.U, "hffffffc0000".U(maskLen.W), Mux(level===2.U, "hffffffffe00".U(maskLen.W), Mux((!memRdata.c && memRdata.n && memRdata.ppn(napot_bits-1,0) === napot_patten.U),napot_mask.U(maskLen.W),"hffffffffff".U(maskLen.W))))))
+          }else
+          {
           missMask := Mux(level===5.U, 0.U(maskLen.W), Mux(level===4.U, "hffff8000000".U(maskLen.W), Mux(level===3.U, "hffffffc0000".U(maskLen.W), Mux(level===2.U, "hffffffffe00".U(maskLen.W), "hfffffffffff".U(maskLen.W)))))
+          }
           missMaskStore := missMask
         }
         //printf("level:%d\n",level)
