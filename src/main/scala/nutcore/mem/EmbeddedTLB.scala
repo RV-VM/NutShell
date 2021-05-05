@@ -223,13 +223,8 @@ class EmbeddedTLBExec(implicit val tlbConfig: TLBConfig) extends TlbModule{
   val hitWB = hit && (!hitFlag.a || !hitFlag.d && req.isWrite()) && !hitinstrPF && !(loadPF || storePF || io.pf.isPF())
   val hitRefillFlag = Cat(req.isWrite().asUInt, 1.U(1.W), 0.U(6.W)) | hitFlag.asUInt
   //fix :napot should remain the C/N bit
-  val hitWBStore = when(hitMeta.mask === napot_mask.U)
-                  {
-                    RegEnable(Cat(0.U(1.W),1.U(1.W),0.U(8.W), hitData.ppn, 0.U(2.W), hitRefillFlag), hitWB)
-                  }.otherwise
-                  {
-                    RegEnable(Cat(0.U(10.W), hitData.ppn, 0.U(2.W), hitRefillFlag), hitWB)
-                  }
+  val hitWBStore = Mux(hitMeta.mask === napot_mask.U,RegEnable(Cat(0.U(1.W),1.U(1.W),0.U(8.W), hitData.ppn, 0.U(2.W), hitRefillFlag), hitWB),RegEnable(Cat(0.U(10.W), hitData.ppn, 0.U(2.W), hitRefillFlag), hitWB))
+                  
 
   // hit permission check
   val hitCheck = hit /*&& hitFlag.v */&& !(pf.priviledgeMode === ModeU && !hitFlag.u) && !(pf.priviledgeMode === ModeS && hitFlag.u && (!pf.status_sum || ifecth))
