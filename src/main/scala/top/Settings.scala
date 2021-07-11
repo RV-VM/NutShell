@@ -40,7 +40,7 @@ object DefaultSettings {
     "EnableILA" -> true,
     "EnableDebug" -> true,
     "EnableRVC" -> true,
-    "Napot_on" -> true
+    "Napot_on" -> false
   )
 }
 
