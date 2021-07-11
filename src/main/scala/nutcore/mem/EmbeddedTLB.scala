@@ -351,7 +351,7 @@ class EmbeddedTLBExec(implicit val tlbConfig: TLBConfig) extends TlbModule{
             }
           }
           if(tlbname == "dtlb") {
-            when((!(permLoad && napotCheck) && req.isRead()) || (!(permStore && napotCheck) && req.isWrite())) { 
+            when( (!permLoad && req.isRead() || !napotCheck) || (!permStore  && req.isWrite()) || !napotCheck) { 
               state := s_miss_slpf
               loadPF := req.isRead() && !isAMO
               storePF := req.isWrite() || isAMO
