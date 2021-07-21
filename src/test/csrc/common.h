@@ -7,7 +7,7 @@
 #include <stdint.h>
 #include <assert.h>
 
-#define NO_DIFFTEST
+// #define NO_DIFFTEST
 
 #ifdef __cplusplus
 # include <stdexcept>

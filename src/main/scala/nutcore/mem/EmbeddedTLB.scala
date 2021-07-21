@@ -115,8 +115,8 @@ class EmbeddedTLB(implicit val tlbConfig: TLBConfig) extends TlbModule{
   mdTLB.reset := reset.asBool || flushTLB
 
   // VM enable && io
-  // val vmEnable = satp.asTypeOf(satpBundle).mode === 8.U && (io.csrMMU.priviledgeMode < ModeM)
-  val vmEnable = satp.asTypeOf(satpBundle).mode === 8.U 
+  val vmEnable = satp.asTypeOf(satpBundle).mode === 8.U && (io.csrMMU.priviledgeMode < ModeM)
+  // val vmEnable = satp.asTypeOf(satpBundle).mode === 8.U 
 
   def PipelineConnectTLB[T <: Data](left: DecoupledIO[T], right: DecoupledIO[T], update: Bool, rightOutFire: Bool, isFlush: Bool, vmEnable: Bool) = {
     val valid = RegInit(false.B)
@@ -239,7 +239,7 @@ class EmbeddedTLBExec(implicit val tlbConfig: TLBConfig) extends TlbModule{
   val hitRefillFlag = Cat(req.isWrite().asUInt, 1.U(1.W), 0.U(6.W)) | hitFlag.asUInt
   //!!! PPN needs to be 44 bit-width 
   val hitPTEStore = RegEnable(Cat(0.U(10.W) , 0.U( (44 - hitData.ppn.getWidth).W ) , hitData.ppn, 0.U(2.W), hitRefillFlag), hitWB)
-  val hitNapotPTEStore = if (!napot_on) null else RegEnable(Cat(0.U(1.W),1.U(1.W),0.U(8.W), 0.U( (44 - hitData.ppn.getWidth).W ) , hitData.ppn, 0.U(2.W), hitRefillFlag), hitWB)
+  val hitNapotPTEStore = if (!napot_on) null else RegEnable(Cat(1.U(1.W),0.U(9.W), 0.U( (44 - hitData.ppn.getWidth).W ) , hitData.ppn, 0.U(2.W), hitRefillFlag), hitWB)
   val hitWBStore =  if(napot_on)
                     Mux(hitMeta.mask === napot_mask.U,hitNapotPTEStore,hitPTEStore)
                   else 
@@ -341,7 +341,7 @@ class EmbeddedTLBExec(implicit val tlbConfig: TLBConfig) extends TlbModule{
           val updateAD = if (Settings.get("FPGAPlatform")) !missflag.a || (!missflag.d && req.isWrite()) else false.B
           val updateData = Cat( 0.U(56.W), req.isWrite(), 1.U(1.W), 0.U(6.W) )
           val napotCheck = if(napot_on) 
-                              ((level =/= 1.U) || ((!memRdata.c && memRdata.n && memRdata.ppn(napot_bits-1,0) === napot_patten.U) || (!memRdata.c && !memRdata.n)))
+                              ((level =/= 1.U) || ((memRdata.n && memRdata.ppn(napot_bits-1,0) === napot_patten.U) || !memRdata.n))
                             else 
                               true.B
           missRefillFlag := Cat(req.isWrite(), 1.U(1.W), 0.U(6.W)) | missflag.asUInt
@@ -364,7 +364,7 @@ class EmbeddedTLBExec(implicit val tlbConfig: TLBConfig) extends TlbModule{
             }
           }
           if(napot_on)
-            missMask := Mux(level===3.U, 0.U(maskLen.W), Mux(level===2.U, "h3fe00".U(maskLen.W), Mux((!memRdata.c && memRdata.n && memRdata.ppn(napot_bits-1,0) === napot_patten.U),napot_mask.U(maskLen.W),"h3ffff".U(maskLen.W))))
+            missMask := Mux(level===3.U, 0.U(maskLen.W), Mux(level===2.U, "h3fe00".U(maskLen.W), Mux((memRdata.n && memRdata.ppn(napot_bits-1,0) === napot_patten.U),napot_mask.U(maskLen.W),"h3ffff".U(maskLen.W))))
           else
             missMask := Mux(level===3.U, 0.U(maskLen.W), Mux(level===2.U, "h3fe00".U(maskLen.W), "h3ffff".U(maskLen.W)))
           missMaskStore := missMask

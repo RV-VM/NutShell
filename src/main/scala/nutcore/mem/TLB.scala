@@ -95,12 +95,10 @@ sealed trait Sv39Const extends HasNutCoreParameter{
     Cat(Cat(ppn, vpnn), 0.U(3.W))
   }
   
-  def pteBundle = new Bundle {
-    
-    val c = if(napot_on) Bool() else null
+  def pteBundle = new Bundle {   
     val n = if(napot_on) Bool() else null
     
-    val reserved  = if (napot_on) UInt((pteResLen - 2).W) else UInt(pteResLen.W)
+    val reserved  = if (napot_on) UInt((pteResLen - 1).W) else UInt(pteResLen.W)
     val ppn  = UInt(ppnLen.W)
     val rsw  = UInt(2.W)
     val flag = new Bundle {
